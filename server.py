@@ -2,8 +2,12 @@ from fastmcp import FastMCP
 import asyncio, json, os
 from src.action import get_sub_spots, get_main_spots, get_spots, get_spots_filtered
 from src.serialization import serialize_spots, spot_to_dict
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+import uvicorn
 
 mcp = FastMCP(name="trip")
+app = FastAPI(title="GoGo AI Trip Backend")
 
 # 與聊天 prompt 一致：喜歡／不喜歡風格枚舉
 VALID_TRIP_STYLES = frozenset(
@@ -418,14 +422,82 @@ async def ping(text: str | None = None) -> str:
         {"ok": True, "reply": "pong", "echo": text},
         ensure_ascii=False
     )
+@app.get("/")
+async def root():
+    return {
+        "message": "GoGo AI Trip Backend is running",
+        "mcp_endpoint": "/mcp",
+        "docs": "/docs"
+    }
 
-async def main():
+
+@app.get("/health")
+async def health():
+    return {
+        "ok": True,
+        "status": "running"
+    }
+
+
+@app.get("/spots/top10")
+async def api_top10_spots():
+    data = await get_spots()
+    return JSONResponse(content=[spot_to_dict(s) for s in data[:10]])
+
+
+@app.get("/spots/main")
+async def api_main_spots():
+    data = await get_main_spots()
+    return JSONResponse(content=[spot_to_dict(s) for s in data])
+
+
+@app.get("/spots/sub")
+async def api_sub_spots():
+    data = await get_sub_spots()
+    return JSONResponse(content=[spot_to_dict(s) for s in data])
+
+
+@app.get("/spots/search")
+async def api_search_spots(keyword: str, limit: int = 20):
+    data = await get_spots()
+    limit = max(1, min(50, _safe_int(limit, 20)))
+    matched = []
+
+    for s in data:
+        spot = spot_to_dict(s)
+        if _contains_keyword(spot, keyword):
+            matched.append(spot)
+
+    return JSONResponse(content=matched[:limit])
+
+
+@app.get("/spots/summary")
+async def api_spots_summary():
+    data = await get_spots()
+    pops = [_safe_get_popularity(spot_to_dict(s)) for s in data]
+
+    if not pops:
+        return {"count": 0, "min": None, "max": None, "avg": None}
+
+    return {
+        "count": len(pops),
+        "min": min(pops),
+        "max": max(pops),
+        "avg": sum(pops) / len(pops)
+    }
+
+
+app.mount("/mcp", mcp.http_app())
+
+def main():
     port = int(os.environ.get("PORT", "8080"))
-    await mcp.run_async(
-        transport="http",
+
+    uvicorn.run(
+        app,
         host="0.0.0.0",
-        port=port,
+        port=port
     )
 
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
