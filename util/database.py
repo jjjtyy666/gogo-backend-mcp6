@@ -9,11 +9,10 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 
 load_dotenv()
 
-# 資料庫連線字符串
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+psycopg://postgres:_5H)6Nm`10fL<1x^@34.81.19.52/postgres"
-)
+# 資料庫連線字符串（由環境變數提供，適合 Cloud Run）
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is not set. Please configure DATABASE_URL environment variable.")
 
 # --- Sync engine/session (kept for backward compatibility) ---
 engine = create_engine(DATABASE_URL, echo=False)

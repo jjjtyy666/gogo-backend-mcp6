@@ -1,5 +1,5 @@
 from fastmcp import FastMCP
-import asyncio, json
+import asyncio, json, os
 from src.action import get_sub_spots, get_main_spots, get_spots, get_spots_filtered
 from src.serialization import serialize_spots, spot_to_dict
 
@@ -420,8 +420,12 @@ async def ping(text: str | None = None) -> str:
     )
 
 async def main():
-    # Use run_async() in async contexts
-    await mcp.run_async(transport="http", port=8000)
+    port = int(os.environ.get("PORT", "8080"))
+    await mcp.run_async(
+        transport="http",
+        host="0.0.0.0",
+        port=port,
+    )
 
 if __name__ == "__main__":
     asyncio.run(main())
